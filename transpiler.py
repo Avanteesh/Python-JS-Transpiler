@@ -268,6 +268,9 @@ class PythonToJavascript:
         elif isinstance(node, ast.List) == True or isinstance(node, ast.Tuple) == True:
             lis_string = ", ".join([self.transpile_expression(item) for item in node.elts])
             return f"[{lis_string}]"
+        elif isinstance(node, ast.Set) == True:
+            set_str = ", ".join([self.transpile_expression(item) for item in node.elts])
+            return f"new Set([{set_str}])"
         elif isinstance(node, ast.Dict) == True:
             _dict = {f"{i.value}":self.transpile_expression(k) for i in node.keys for k in node.values}
             return f"{_dict}"
