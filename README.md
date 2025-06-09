@@ -8,7 +8,8 @@ Python's Abstract Syntax Tree and parse it down to Javascript source code, by us
 to be noted is If your transpiling python sources that have certain dependencies, it may not necessary transpile appropriate Target Javascript source. 
 
 <b>Data Structure Singly Linked lists is utilized to check for Variable declarations and scoping</b>
+<img src="/montages/lexical.webp" height="400" />
 
 <h1>Tests</h1>
-<img src="/montages/test-1.png" height="700" alt="test no. 1" />
-<img src="/montages/test-2.png" height="700" alt="test no. 2" />
+<img src="/montages/test-1.png" height="500" alt="test no. 1" />
+<img src="/montages/test-2.png" height="500" alt="test no. 2" />
