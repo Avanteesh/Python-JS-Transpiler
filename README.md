@@ -1,6 +1,6 @@
 # Python to Javascript Source code Transpiler
 
-<img src="/montages/Transpiler-Architecture.jpeg" height="600" />
+<img src="/montages/Transpiler-Architecture.jpeg" height="550" />
 
 So, I have been trying to explore really deep on Compilers, Linters and Programming languages in general, And this project was a fun one to build.
 A transpiler takes existing source code's abstract syntax tree, and converts it into a target programming language. In this case I have made use of the 
@@ -13,6 +13,6 @@ using the python's AST.
 <img src="/montages/lexical.webp" height="400" />
 
 <h1>Tests</h1>
-<img src="/montages/test-1.png" height="400" alt="test no. 1" />
-<img src="/montages/test-2.png" height="400" alt="test no. 2" />
-<img src="/montages/test-3.png" height="400" alt="test no. 3" />
+<img src="/montages/test-1.png" height="380" alt="test no. 1" />
+<img src="/montages/test-2.png" height="380" alt="test no. 2" />
+<img src="/montages/test-3.png" height="380" alt="test no. 3" />
