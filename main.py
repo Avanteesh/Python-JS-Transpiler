@@ -39,6 +39,7 @@ def main():
         os._exit(1)
     source = buildSource(target_file)
     if output_file != None:
+        print("File created!")
         with open(output_file, "w") as f1:
             f1.write(source.target_lang)
         os._exit(0)

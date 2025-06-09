@@ -1,6 +1,7 @@
 import ast
 import colorama as col
 from lexical_scope import LexicalScope, searchVariableDeclaration
+from analyzefunction import AnalyzeFunctionDef
 
 class PythonToJavascript:
     def __init__(self):
@@ -8,7 +9,7 @@ class PythonToJavascript:
         self.global_lexicalenv = LexicalScope()   # global lexical environment!
 
     def ast_analyze(self, node: ast.AST):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, ast.FunctionDef) == True or isinstance(node, ast.AsyncFunctionDef) == True:
             self.target_lang += self.transpile_function(node)
         elif isinstance(node, ast.Expr):
             self.target_lang += self.transpile_expression(node)
@@ -24,14 +25,14 @@ class PythonToJavascript:
             self.target_lang += self.transpile_classDef(node)
         elif isinstance(node, ast.AugAssign):
             self.target_lang += self.transpile_AugAssign(node)
-        elif isinstance(node, ast.AsyncFunctionDef):
-            self.target_lang += self.transpile_function(node)
         elif isinstance(node, ast.If):
             self.target_lang += self.transpile_IfExp(node)
         elif isinstance(node, ast.While):
             self.target_lang += self.transpile_While(node)
         elif isinstance(node, ast.IfExp):
             self.target_lang += self.transpile_TernaryExp(node)
+        elif isinstance(node, ast.Match):
+            self.target_lang += self.transpile_Match(node)
 
     def visit(self, node: ast.Module):
         for nodes in node.body:
@@ -40,25 +41,28 @@ class PythonToJavascript:
     def transpile_function(self, node: ast.FunctionDef, scope_level: int=1,isinclass=False):
         if node.name[0].isupper():
             raise TypeError(f"{col.Fore.RED}Error:{col.Fore.WHITE} function names must start in lower case!")
+        analyzer = AnalyzeFunctionDef()
+        analyzer.visit(node)
         arg_list = [item.arg for item in node.args.args if item.arg != "self"]
         GAP = "" if scope_level == 1 else " " * scope_level
         function_name = node.name
         if len(node.name) >= 2 and isinclass == True:
             if node.name[0] == "_" and node.name[1] == "_":
                 function_name = f"#{node.name[2:]}"
+        generator_exp = "*" if analyzer.is_generator == True else ""
         if isinstance(node, ast.AsyncFunctionDef):
             if isinclass == True:
-                function_code = f"\n{GAP}async {function_name}({",".join(arg_list)})"
+                function_code = f"\n{GAP}async {generator_exp}{function_name}({",".join(arg_list)})"
             else:
-                function_code = f"\n{GAP}async function {function_name}({",".join(arg_list)})  {'{'}\n"
+                function_code = f"\n{GAP}async {generator_exp}function {function_name}({",".join(arg_list)})  {'{'}\n"
         else:
             if isinclass == True:
                 if len(node.args.args) == 0 or node.args.args[0].arg != "self" and (node.decorator_list[0].id == "staticmethod" or node.decorator_list[0].id == "classmethod"):
-                    function_code = f"\n{GAP}static {function_name}({",".join(arg_list)}) {'{'}\n"
+                    function_code = f"\n{GAP}static {generator_exp}{function_name}({",".join(arg_list)}) {'{'}\n"
                 else:
-                    function_code = f"\n{GAP}{function_name}({",".join(arg_list)}) {'{'}\n"
+                    function_code = f"\n{GAP}{generator_exp}{function_name}({",".join(arg_list)}) {'{'}\n"
             else:
-                function_code = f"\n{GAP}function {node.name}({",".join(arg_list)})  {'{'}\n"
+                function_code = f"\n{GAP}function{generator_exp} {node.name}({",".join(arg_list)})  {'{'}\n"
         for content in node.body:
             if isinstance(content, ast.FunctionDef):
                 function_code += self.transpile_function(content, scope_level + 1)
@@ -76,6 +80,8 @@ class PythonToJavascript:
                 function_code += f"{GAP} {self.transpile_expression(content)}"
             elif isinstance(content, ast.Match):
                 function_code += f"{GAP} {self.transpile_Match(content)}"
+            elif isinstance(content, ast.While):
+                function_code += self.transpile_While(content, scope_level+1)
         function_code += f"{GAP}{'}'}\n"
         return function_code
 
@@ -158,6 +164,8 @@ class PythonToJavascript:
                 statement += self.transpile_IfExp(code, scope_level + 1, parent_scope=lexical_scope)
             elif isinstance(code, ast.For):
                 statement += self.transpile_for(code, scope_level+1, lexical_scope)
+            elif isinstance(code, ast.Yield):
+                statement += f"{GAP}{self.transpile_expression(code.value)};\n"
         statement += f"{GAP}{'}'}\n"
         return statement
 
@@ -187,9 +195,11 @@ class PythonToJavascript:
             elif isinstance(content, ast.If):
                 statement += self.transpile_IfExp(content, scope_level + 1, lexical_scope)
             elif isinstance(content, ast.Expr):
-                statement += f"{GAP} {self.transpile_expression(content.value)}"
+                statement += f"{GAP} {self.transpile_expression(content.value)}\n"
             elif isinstance(content, ast.Assign):
                 statement += f"{GAP} {self.transpile_assign(content, lexical_scope)}"
+            elif isinstance(content, ast.Match):
+                statement += self.transpile_Match(content, scope_level+1, lexical_scope)
         statement += f"{GAP}{'}'}\n"
         return statement
     
@@ -245,6 +255,8 @@ class PythonToJavascript:
             return self.transpile_Compare(node)
         elif isinstance(node, ast.Subscript):
             return self.transpile_Subscript(node)
+        elif isinstance(node, ast.Yield):
+            return f"yield {self.transpile_expression(node.value)}"
         elif isinstance(node, ast.JoinedStr):
             return self.transpile_JoinedStr(node)
         elif isinstance(node, ast.Await):
@@ -296,8 +308,8 @@ class PythonToJavascript:
             result += f"{exp} ({self.transpile_expression(node.test)}) {'{'}\n" 
         for expression in node.body:
             if isinstance(expression, ast.Expr):
-                expression = expression.value
-            if isinstance(expression, ast.If):
+                result += f"{GAP} {self.transpile_expression(expression)};\n"
+            elif isinstance(expression, ast.If):
                 result += self.transpile_IfExp(expression, scope_level + 1, False, lexical_scope)
             elif isinstance(expression, ast.Return):
                 result += f"{GAP} {self.transpile_Return(expression)}"
@@ -313,6 +325,8 @@ class PythonToJavascript:
                 result += f"{GAP} {self.transpile_import(expression)}"
             elif isinstance(expression, ast.Assign):
                 result += f"{GAP} {self.transpile_assign(expression, lexical_scope)}"
+            elif isinstance(expression, ast.Match):
+                result += self.transpile_Match(expression, scope_level+1, lexical_scope)
         result += f"{GAP}{'}'}\n"
         if node.orelse == []:
             return result
@@ -343,13 +357,13 @@ class PythonToJavascript:
         lexical_scope = LexicalScope()
         lexical_scope.parent_ref = self.global_lexicalenv if parent_scope == None else parent_scope
         gap = "" if scope_level == 1 else " "*scope_level
-        statement = f"{gap}switch ({expression}) {'{'}\n"
+        statement = f"{gap}switch ({_expression}) {'{'}\n"
         for cases in node.cases:
             if isinstance(cases.pattern, ast.MatchValue):
                 case_exp = self.transpile_expression(cases.pattern.value)
-                statement += f"{gap}  case {case_exp}:\n"
+                statement += f"{gap} case {case_exp}: {'{'}\n"
             elif isinstance(cases.pattern, ast.MatchAs):
-                statement += f"{gap}  default:\n"
+                statement += f"{gap} default: {'{'}\n"
             for _code in cases.body:
                 if isinstance(_code, ast.Match):
                     statement += _self.transpile_Match(_code, scope_level + 1, lexical_scope)
@@ -361,9 +375,11 @@ class PythonToJavascript:
                     statement += f"{gap}{self.transpile_Return(_code)}"
                 if isinstance(_code, ast.Assign):
                     statement += f"{gap}{self.transpile_assign(_code)}"
+                if isinstance(_code, ast.Expr):
+                    statement += f"{gap}  {self.transpile_expression(_code)};\n"
             if isinstance(cases, ast.MatchValue):
                 statement += f"{gap} break;\n"
-            statement += f"{gap}{'}'}\n"
+            statement += f"{gap} {'}'}\n"
         statement += f"{gap}{'}'}\n"
         return statement
 
