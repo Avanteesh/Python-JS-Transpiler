@@ -263,6 +263,8 @@ class PythonToJavascript:
             return f"await {self.transpile_expression(node.value)}"
         elif isinstance(node, ast.IfExp):
             return self.transpile_TernaryExp(node)
+        elif isinstance(node, ast.NamedExpr):
+            return f"({node.target.id} = {self.transpile_expression(node.value)})"
         elif isinstance(node, ast.Attribute):
             top = self.transpile_expression(node.value)
             if top == 'self':
